@@ -151,9 +151,7 @@ code rabbitmq.conf
 
 ```
 
-Copy and past the content below inside the file. If you read the section about the configuration options, it's basically self explanatory. We are basically telling the server that we don't want to accept connections from unauthenticated clients, the user name and password for MQTT connections, ports that we want to use to listen for new connections, the virtual host inside RabbitMQ server and the default Exchange to receive MQTT messages.
-
-Don't worry about the Exchange, I will explain on the next session.
+Copy and past the content below inside the file. If you read the section about the configuration options, it's basically self explanatory. We are basically telling the server that we don't want to accept connections from unauthenticated clients, the user name and password for MQTT connections, ports that we want to use to listen for new connections, the virtual host inside RabbitMQ server and the default Exchange to receive MQTT messages (I will talk a little bit about it inside the next sessions, don't worry).
 
 Basic configuration file content 
 ```
@@ -307,58 +305,33 @@ You must see status Up :)
 
 
 ## 7. User Authentication and the basic about MQTT Users inside RabbitMQ    
-<!-- 
-As you know, our use case has a server with authentication. So we need to choose the username and password for our mosquitto server.
-We need to use mosquitto_passwd tool for it. Don't worry, Mosquitto comes with a set of tools and one of them is mosquitto_passwd.
-To use it, we need to access the container to get access to the tool or just execute the it using docker exec with the right arguments:
 
-Now, remember that the pwfile is empty, so we need to add users to our configuration file using the command:
+As you know, our use case has a server with authentication. So we need to choose the username and password for our RabbitMQ server.
+I want to keep the server configuration as simple as possible because there is a lot of small details when you try to use MQTT over RabbitMQ and if we create another user we will just add another detail without add any important information from the protocol perspective. So, I will use the default user of the image (guest:guest) to access the server and we can talk a little bit about the rabbitmq permission model with mqtt. 
 
-### Windows 
+Rabbitmq uses **Virtual Hosts** to create logic groups for resources (queues, exchanges, connections, user permissions, etc). So, each user permission is handled within a virtual host and user access to the MQTT structure within RabbitMQ is not an exception. You can see it when we create the configuration file for rabbitmq:
 
-```shell
-docker exec mosquitto mosquitto_passwd -b /etc/mosquitto/passwd guest guest
+Remember the config file:
+```
+mqtt.allow_anonymous  = false
+mqtt.default_user = guest
+mqtt.default_pass = guest
+
+mqtt.vhost            = /
+mqtt.exchange         = amq.topic
 
 ```
+Now it's easy to understand the configuration, RabbitMQ uses the configuration file to define his own structure for MQTT. Every MQTT connection uses the **mqtt.default_user** to access the server and that user will use **mqtt.vhost** as scope for permission.  The default configuration of the image already have the guest user with permission on the virtual host, so, we don't need to make it happen.
 
-### Linux 
+The **mqtt.exchange = amq.topic** is the default exchange for MQTT messages (every single one of them). MQTT works with Topics and doesn't know what is an Exchange. RabbitMQ uses the default MQTT Exchange to provide one way to deliver MQTT Messages to AMQP clients using binding rules over this Exchange. So, if you want to "route" one MQTT message to one AMQP Queue, you could create a rule to bind this Exchange to the Queue that you want.
 
-```shell
-sudo docker exec mosquitto mosquitto_passwd -b /etc/mosquitto/passwd guest guest
+Just remember that you need to create the structure (Queue, binding rules, user, etc) inside the same virtual host.
 
-```
-In our case, we created the user guest with the guest password. If you want to add more than one user, it's a good opportunity to learn how to connect to the container. The idea is the same, you need to execute a program that will provide access to send commands to the container. The shell.
-
-The nexte session will provide commands to connect to the container and create more users. You can skip this session if you want.
-
-## X.1 Connecting to the container to create more users
-
-This is simple, call the terminal (sh) using docker exec and use the same tool to create so many users you want.  
-
-### Windows 
-
-```shell
-
-#calling SH (mosquitto is our container name, please, pay attention)
-docker exec -it mosquitto sh
-
-# now you don't need to use docker exec, just call the mosquitto tool to create the new user
-mosquitto_passwd -b /etc/mosquitto/passwd username2 passw2
-
-#repeat the process every time that you need to create one user
-# type 'exit' when you finish
-
-#restart the container (mosquitto is the name of the container)
-docker restart mosquitto
-
-```
-## Linux 
-
-For linux you basically need to add **sudo** for each docker command. -->
+You can find more information about Virtual Hosts [here](https://www.rabbitmq.com/docs/vhosts)
 
 ## 8. Testing the environment 
 
-Ok, now you have everything that you need to start using the broker. It's time to test our setup using some tools (clients) and we are done. You can use it to develop your mqtt aplications. 
+Ok, now you have everything that you need to start using the broker. It's time to test our setup using some tools (clients) and we are done. After it, you can use it to develop your mqtt aplications. 
 
 ### A little bit about MQTT and the test use case
 
@@ -372,24 +345,31 @@ Some people might think that it doesn't make sense to put another program in bet
 
 Most of the time you also need to implement Patterns to control the flow of events between services and the broker will provide the framework for this with abstraction for storage, concurrency, different protocols and it is also a good way to scale the architecture layer that hosts your events.
 
-If you don't understand those lines above, you should take a look at the pub/sub pattern or take a look at mosquitto documentation [here](https://mosquitto.org/man/mqtt-7.html).
+If you don't understand those lines above, you should take a look at the pub/sub pattern or take a look at RabbitMQ documentation [here](https://www.rabbitmq.com/tutorials/tutorial-three-dotnet).
 
+One important concept behind MQTT Topics: You don't need to create the MQTT Topic on the server before you start using it. They are more like "filters" for messages instead of Queues. So, you don't need to change the server if you want to change the structure of the topic (this is not true for AMQP, your exchanges and the binding rules). 
 
 Remember the test scenario:
  - One client will Subscribe the topic home/bedroom/temperature. 
  - One Client will Publish one message with the value (42 - meaning of the life) to the same topic.
 
-Our mosquitto image already have the basic tools (mosquitto_pub/mosquitto_sub) to test the broker you don't need to install them if you want to use it. 
+Now, let's talk about the clients to send and receive messages.
+
+### The client (Curl)
+RabbitMQ doesn't have a tool to test the MQTT protocol so, we will use [**Curl**](https://curl.se/) because it's a common tool. If you are using Windows, you can face the error: curl: "(1) Protocol "mqtt" not supported or disabled in libcurl" when you try to use it with the default version or Command not found if you don't have it. Just create a folder "Curl" on your machine and download the right latest version and it works.
 
 ### Let's start the program to "listen" the messages that we send to the topic. (subscriber)
 
-Remember that we configurated our broker with authentication, so we need to call the program with the right credentials.
+Remember that we configurated our broker with authentication, so we need to call the program with the right credentials and
+Curl don't like to Display binary data to the console then we need to send the output to a file.
+
+Now access the folder where you downloaded the Curl and: 
 
 ### Windows
 ```shell
 
 # Subscribe to the topic with authentication
-docker exec mosquitto mosquitto_sub -u guest -P guest -v -t 'home/bedroom/temperature'
+curl -u guest:guest mqtt://localhost:1883/home/bedroom/temperature --output test.txt
 
 ```
 
@@ -397,31 +377,43 @@ docker exec mosquitto mosquitto_sub -u guest -P guest -v -t 'home/bedroom/temper
 ```shell
 
 # Subscribe to the topic with authentication
-sudo docker exec mosquitto mosquitto_sub -u guest -P guest -v -t 'home/bedroom/temperature'
+curl -u guest:guest mqtt://localhost:1883/home/bedroom/temperature --output test.txt
 
 ```
 Keep the window open. 
 
+
 ### Let's start the program to "publish" the messages that we send to the topic. (publisher)
+
+Open another Sheel and access the folder where you downloaded Curl:
 
 ### Windows
 ```shell
 
 # Subscribe to the topic with authentication
-docker exec mosquitto mosquitto_pub -u guest -P guest  -t 'home/bedroom/temperature' -m '42'
+curl -u guest:guest -d " 42 " mqtt://localhost:1883/home/bedroom/temperature
+
 ```
 
 ### Linux 
 ```shell
 
 # Subscribe to the topic with authentication
-sudo docker exec mosquitto mosquitto_pub -u guest -P guest  -t 'home/bedroom/temperature' -m '42'
+curl -u guest:guest -d " 42 " mqtt://localhost:1883/home/bedroom/temperature
 
 ```
 
-You should see: 'home/bedroom/temperature' '42' on the windows running the subscriber (mosquitto_sub).
-Keep the window open and try new messages. 
+You should repeat that command many times with different values (42, 41, 45, ...). The subscriber is listening that messages and writing every single one the file **test.txt**.
 
+Now, you can open the file using VS Code or other text editor:
+
+```shell
+code test.txt
+```
+
+I know that is not easy to keep the subscriber open and try to read a ugly file every time that you want to test your application, so, I also would like to suggest to use [MQTT Explorer](https://mqtt-explorer.com/). It has a graphic interface and you can read/send messages to the server and keep it connected. 
+
+It's easy to test everything with it and you also can see different topics at the same time.
 
 ## 9. That is it.
 
