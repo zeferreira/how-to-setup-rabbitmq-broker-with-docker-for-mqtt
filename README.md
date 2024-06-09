@@ -3,8 +3,8 @@
 This is a configuration for a development environment. Don't use it for production environment. 
 It works for Windows and Linux Environments (tested with windows).
 
-The scenario is simple, the RabbitMQ broker will start without peristence and with basic authentication for one user (or more).
-After it, we will test the local environment with common mtqq clients and tools (you can choose witch one you want to use).
+The scenario is simple, the RabbitMQ broker will start without peristence and with basic authentication for one user.
+After it, we will test the local environment with common MQTT clients and tools (you can choose witch one you want to use).
 
 ## The test scenario:
  - One client will Subscribe the topic home/bedroom/temperature. 
@@ -15,7 +15,7 @@ After it, we will test the local environment with common mtqq clients and tools 
  - I tested some commands from outside the container (from the host)<!--(curl and MQTT Explorer)-->. 
  
 <!-- ** I wrote one little C# application to test the flow with the broker. Not yet, but I'm working on it' -->
- - I'm using **Visual Studio Code (VScode)** because I like to see the highlight sintax of the files and I already have it on my machine, but you can use whatever you want to **create the configuration/password files** . Choose one text editor make the samples for shell commands more simple when I created this file. For god sake, give me a break. It's just a text editor.
+ - I'm using **Visual Studio Code (VScode)** because I like to see the highlight sintax of the files and I already have it on my machine, but you can use whatever you want to **create the configuration files** . Choosing one text editor make the samples for shell commands more simple when I created this file. For god sake, give me a break. It's just a text editor.
 
 You can download it [here](https://code.visualstudio.com/download) from the oficial website. 
 Teach about how to install the VSCode is out of the scope of this document.
@@ -72,9 +72,9 @@ Another consequence is that you need to create and scale another service to read
 
 On the other hand, if you choose to work with RabbitMQ you will only have one cluster running and only one stack to deal with. The development team does not need to deal with requirements from different brokers and the team's common experience/vocabulary will be the same. Communication is very fast just because everyone has the same experience with the same tool.
 
-Communication is really underrated these days. Even when DDD and domain specialists working with the team, you always have one specific information that create a misunderstanding when domain specialists talk with developers and you will face the same situation with a big team using different interfaces and stacks. 
+Communication is really underrated these days. Even when DDD and domain specialists working with the team, you always have one specific information that create a misunderstanding when domain specialists talk to developers and you will face the same situation with a big team using different interfaces and stacks. 
 
-And RabbitMQ wasn't designed for MQTT, so there's a trade-off if you choose to work with it. The protocol implementation is basically an emulation so it is necessary to understand what is implemented and what is not (QOS levels, for example). You also need to pay attention to application performance in some situations (more levels in the same mqtt topic) and specific management tools.
+And RabbitMQ wasn't designed for MQTT, so there's a trade-off if you choose to work with it. The protocol implementation is basically an "emulation" so it is necessary to understand what is implemented and what is not (QOS levels, for example). You also need to pay attention to application performance in some situations (more levels for the same MQTT topic) and specific management tools.
 
 On the first moment, you will add complexity when you choose to adapt your broker to another protocol, but on the long term you just need to keep it running and people already know how to deal with it.
 
@@ -176,8 +176,7 @@ mqtt.max_session_expiry_interval_seconds = 86400
 
 As you know RabbitMQ was not designed to work with MQTT and the current implementation needs to "emulate" the MQTT model using the current RabbitMQ design. To understand the features implemented and how we can use RabbitMQ with both protocols, we need to understand the basic concepts behind the protocols.
 
- - MQTT: As you know, the MQTT model is simple a publisher sends a message to a topic and the active consumers read the message. The topic structure is divided using "/". Ex.: TopicLevel1/TopicLevel2/TopicLevel3. In our scenario we have a Subscriber listening (consuming) to the topic "home/bedroom/temperature" and a Publisher sending (publishing) messages to the same topic. 
-
+ - MQTT: As you know, the MQTT model is simple, a publisher sends a message to a topic and the active consumers read the message. The topic structure is divided using "/" (slash). Ex.: TopicLevel1/TopicLevel2/TopicLevel3. In our scenario we have a Subscriber listening (consuming) to the topic "home/bedroom/temperature" and a Publisher sending (publishing) messages to the same topic. 
 
  - AMQP: AMQP has a different model, You have a Publisher publishing (sending) Messages to an Exchange, the server apply binding rules to the Message and "route" it to Queues and Consumers will Consume (read) the queue. You also have different types of Exchanges and binding rules. This structure is part of the AMQ Model. Other players that use AMQP don't necessarily implement this AMQ Model structure and sometimes they implement just the AMQP Protocol. You could find more information about the protocol [here](https://www.amqp.org/resources/download) or [here](https://www.rabbitmq.com/tutorials/amqp-concepts). 
 
@@ -215,7 +214,7 @@ code docker-compose.yml
 
 Copy and paste the content below into your **docker-compose.yml** file. The file is very simple, we are just using the broker's official image, exposing the protocol ports (these numbers are standard for AMQP/MQTT) and mapping the folder/file structure that we created previously.
 
-Some details you could pay attention to:
+There are some details you should pay attention to:
 - We exposed the same ports that we configured inside the configuration file. Without it, well, you know, you have no 'doors', right? With it, the container will accept connections on these ports and the service inside the container will also accept connections on the same ports. If you are running other containers on your docker, you need to check if your host has a service that is already using these ports.
 
 - We are using the default RabbitMQ persistence model. Unlike our mosquitto configuration file ([other compose](https://github.com/zeferreira/how-to-setup-mosquitto-broker-with-docker)) we don't have a session with the configuration for persistence. RabbitMQ has a complex model with different options to store information for different versions and Queue types, for the our scenario we don't need to change it but, if you want to take a look at the persistence model and configuration you could take a look [here](https://www.rabbitmq.com/docs/persistence-conf). 
@@ -309,7 +308,7 @@ You must see status Up :)
 As you know, our use case has a server with authentication. So we need to choose the username and password for our RabbitMQ server.
 I want to keep the server configuration as simple as possible because there is a lot of small details when you try to use MQTT over RabbitMQ and if we create another user we will just add another detail without add any important information from the protocol perspective. So, I will use the default user of the image (guest:guest) to access the server and we can talk a little bit about the rabbitmq permission model with mqtt. 
 
-Rabbitmq uses **Virtual Hosts** to create logic groups for resources (queues, exchanges, connections, user permissions, etc). So, each user permission is handled within a virtual host and user access to the MQTT structure within RabbitMQ is not an exception. You can see it when we create the configuration file for rabbitmq:
+Rabbitmq uses **Virtual Hosts** to create logic groups for resources (queues, exchanges, connections, user permissions, etc). So, each user permission is handled within a virtual host and user access to the MQTT structure within RabbitMQ is not an exception. You can see it when we created the configuration file for rabbitmq:
 
 Remember the config file:
 ```
@@ -321,7 +320,7 @@ mqtt.vhost            = /
 mqtt.exchange         = amq.topic
 
 ```
-Now it's easy to understand the configuration, RabbitMQ uses the configuration file to define his own structure for MQTT. Every MQTT connection uses the **mqtt.default_user** to access the server and that user will use **mqtt.vhost** as scope for permission.  The default configuration of the image already have the guest user with permission on the virtual host, so, we don't need to make it happen.
+Now it's easy to understand the configuration, RabbitMQ uses the configuration file to define his own structure for MQTT. Every MQTT connection uses the **mqtt.default_user** to access the server and that user will use **mqtt.vhost** as scope for permission.  The default configuration of the image already have the guest user with permission on the virtual host "/" (slash), so, we don't need to make it happen.
 
 The **mqtt.exchange = amq.topic** is the default exchange for MQTT messages (every single one of them). MQTT works with Topics and doesn't know what is an Exchange. RabbitMQ uses the default MQTT Exchange to provide one way to deliver MQTT Messages to AMQP clients using binding rules over this Exchange. So, if you want to "route" one MQTT message to one AMQP Queue, you could create a rule to bind this Exchange to the Queue that you want.
 
@@ -331,7 +330,7 @@ You can find more information about Virtual Hosts [here](https://www.rabbitmq.co
 
 ## 8. Testing the environment 
 
-Ok, now you have everything that you need to start using the broker. It's time to test our setup using some tools (clients) and we are done. After it, you can use it to develop your mqtt aplications. 
+Ok, now you have everything that you need to start using the broker. It's time to test our setup using some tools (clients) and we are done. After it, you can use it to develop your MQTT/AMQP aplications. 
 
 ### A little bit about MQTT and the test use case
 
@@ -403,7 +402,7 @@ curl -u guest:guest -d " 42 " mqtt://localhost:1883/home/bedroom/temperature
 
 ```
 
-You should repeat that command many times with different values (42, 41, 45, ...). The subscriber is listening that messages and writing every single one the file **test.txt**.
+You should repeat that command many times with different values (42, 41, 45, ...). The subscriber is listening that messages and writing every single one of them to the file **test.txt**.
 
 Now, you can open the file using VS Code or other text editor:
 
@@ -411,13 +410,13 @@ Now, you can open the file using VS Code or other text editor:
 code test.txt
 ```
 
-I know that is not easy to keep the subscriber open and try to read a ugly file every time that you want to test your application, so, I also would like to suggest to use [MQTT Explorer](https://mqtt-explorer.com/). It has a graphic interface and you can read/send messages to the server and keep it connected. 
+I know that is not easy to keep the subscriber open and try to read a **ugly file** every time that you want to test your application, so, I also would like to suggest to use [MQTT Explorer](https://mqtt-explorer.com/). It has a graphic interface and you can read/send messages to the server and keep it connected. 
 
 It's easy to test everything with it and you also can see different topics at the same time.
 
 ## 9. That is it.
 
-That is it. If you did every thing right you have a MQTT broker running over docker you can use it to develop your MQTT Applications.
+That is it. If you did every thing right you have a MQTT broker running over docker and you can use it to develop your MQTT/AMQP Applications.
 Thanks for you attention and let me know if you have some suggestion for this document or if you found a error. If you want to send me something, open one issue or tag me on a discussion.
 
 I really appreciate your time to read this document and hope it's usefull for you.
